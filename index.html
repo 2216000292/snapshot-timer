@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Countdown</title>
+</head>
+<body>
+    <h1>Upload a Photo and Set a Countdown</h1>
+
+    <input type="file" id="photoInput" accept="image/*"><br><br>
+    <input type="number" id="countdownInput" placeholder="Enter countdown (in seconds)">
+    <button id="startButton" onclick="startCountdown()">Start Countdown</button>
+    <button id="getButton" onclick="getPhoto()" >Get Photo</button>
+
+    <div id="message"></div>
+    <img id="photoDisplay" style="display: none;" alt="Uploaded Photo">
+
+    <script>
+        let isCountdownStarted = false;
+
+        async function startCountdown() {
+            if (isCountdownStarted) {
+                alert('Countdown already started. Please wait until it finishes.');
+                return;
+            }
+
+            const photoInput = document.getElementById('photoInput').files[0];
+            const countdownInput = document.getElementById('countdownInput').value;
+
+            if (!photoInput || !countdownInput) {
+                alert('Please upload a photo and set a countdown!');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('photo', photoInput);
+            formData.append('countdown', countdownInput);
+
+            try {
+                const response = await fetch('http://localhost:3000/api/start-countdown', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log(data.message);
+                    document.getElementById('message').textContent = data.message;
+                    isCountdownStarted = true;
+                    document.getElementById('startButton').disabled = true;
+                    document.getElementById('getButton').disabled = true;
+                } else {
+                    alert('Failed to start countdown.');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred. Please check the console for details.');
+            }
+        }
+
+        async function getPhoto() {
+            try {
+                const response = await fetch('http://localhost:3000/api/get-photo');
+
+                if (response.ok) {
+                    const photoBlob = await response.blob();
+                    const photoURL = URL.createObjectURL(photoBlob);
+                    const photoDisplay = document.getElementById('photoDisplay');
+                    photoDisplay.src = photoURL;
+                    photoDisplay.style.display = 'block';
+                    document.getElementById('message').textContent = 'Photo retrieved successfully!';
+                    isCountdownStarted = false;
+                    document.getElementById('startButton').disabled = false;
+                    document.getElementById('getButton').disabled = false;
+                } else if (response.status === 403) {
+                    const data = await response.json();
+                    document.getElementById('message').textContent = data.message;
+                } else {
+                    document.getElementById('message').textContent = 'Failed to retrieve the photo.';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred. Please check the console for details.');
+            }
+        }
+    </script>
+</body>
+</html>
