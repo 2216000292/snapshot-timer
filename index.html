@@ -4,27 +4,68 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Photo Countdown</title>
+    <style>
+        #photoDisplay {
+            max-width: 300px;
+            height: auto;
+        }
+    </style>
 </head>
 <body>
     <h1>Upload a Photo and Set a Countdown</h1>
-
+    <label for="hourInput">Enter hours:</label>
+    <input type="number" id="hourInput" placeholder="Enter hours" min="0">
+    <button onclick="convertToSeconds()">Convert to Seconds</button>
+    <div id="result"></div>
+    <br>
+    <br>
+    <br>
     <input type="file" id="photoInput" accept="image/*"><br><br>
     <input type="number" id="countdownInput" placeholder="Enter countdown (in seconds)">
     <button id="startButton" onclick="startCountdown()">Start Countdown</button>
     <button id="getButton" onclick="getPhoto()" >Get Photo</button>
 
     <div id="message"></div>
+    <div id="countdown"></div>
     <img id="photoDisplay" style="display: none;" alt="Uploaded Photo">
 
     <script>
-        let isCountdownStarted = false;
 
-        async function startCountdown() {
-            if (isCountdownStarted) {
-                alert('Countdown already started. Please wait until it finishes.');
+        function convertToSeconds() {
+            const hours = document.getElementById('hourInput').value;
+            if (hours === '' || hours < 0) {
+                document.getElementById('result').textContent = 'Please enter a valid number of hours.';
                 return;
             }
 
+            const seconds = hours * 60 * 60; // 1 hour = 3600 seconds
+            document.getElementById('result').textContent = `${hours} hour(s) = ${seconds} seconds.`;
+        }
+
+        let countdownTimer = null;
+        window.addEventListener('load', function () {
+            const countdown = localStorage.getItem('countdown');
+            const countdownStartTime = localStorage.getItem('countdownStartTime');
+                // 清除文件选择和倒计时输入框
+            document.getElementById('photoInput').value = '';
+            document.getElementById('countdownInput').value = '';
+            document.getElementById('photoDisplay').style.display = 'none';
+            document.getElementById('message').textContent = '';
+            if (countdown && countdownStartTime) {
+                const currentTime = Date.now();
+                const elapsedTime = Math.floor((currentTime - countdownStartTime) / 1000);
+                const remainingSeconds = Math.max(countdown - elapsedTime, 0);
+
+                if (remainingSeconds > 0) {
+                    // document.getElementById('message').textContent = 'Countdown resumed!';
+                    startCountdownTimer(remainingSeconds);
+                } else {
+                    enableGetPhoto();
+                }
+            }
+        });
+
+        function startCountdown() {
             const photoInput = document.getElementById('photoInput').files[0];
             const countdownInput = document.getElementById('countdownInput').value;
 
@@ -33,55 +74,61 @@
                 return;
             }
 
-            const formData = new FormData();
-            formData.append('photo', photoInput);
-            formData.append('countdown', countdownInput);
+            const reader = new FileReader();
+            reader.onload = function () {
+                const photoDataURL = reader.result;
+                localStorage.setItem('photo', photoDataURL);
+                localStorage.setItem('countdown', countdownInput);
+                localStorage.setItem('countdownStartTime', Date.now());
 
-            try {
-                const response = await fetch('https://snapshot-timer.onrender.com/upload', {
-                    method: 'POST',
-                    body: formData,
-                });
+                document.getElementById('message').textContent = 'Countdown started!';
 
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log(data.message);
-                    document.getElementById('message').textContent = data.message;
-                    isCountdownStarted = true;
-                    document.getElementById('startButton').disabled = true;
-                    document.getElementById('getButton').disabled = true;
-                } else {
-                    alert('Failed to start countdown.');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('An error occurred. Please check the console for details.');
-            }
+                startCountdownTimer(countdownInput);
+            };
+            reader.readAsDataURL(photoInput);
         }
 
-        async function getPhoto() {
-            try {
-                const response = await fetch('https://snapshot-timer.onrender.com/get-photo');
+        function startCountdownTimer(countdownInput) {
+            const countdownElement = document.getElementById('countdown');
+            let remainingSeconds = countdownInput;
 
-                if (response.ok) {
-                    const photoBlob = await response.blob();
-                    const photoURL = URL.createObjectURL(photoBlob);
-                    const photoDisplay = document.getElementById('photoDisplay');
-                    photoDisplay.src = photoURL;
-                    photoDisplay.style.display = 'block';
-                    document.getElementById('message').textContent = 'Photo retrieved successfully!';
-                    isCountdownStarted = false;
-                    document.getElementById('startButton').disabled = false;
-                    document.getElementById('getButton').disabled = false;
-                } else if (response.status === 403) {
-                    const data = await response.json();
-                    document.getElementById('message').textContent = data.message;
-                } else {
-                    document.getElementById('message').textContent = 'Failed to retrieve the photo.';
+            countdownTimer = setInterval(function () {
+                countdownElement.textContent = `Time remaining: ${remainingSeconds} seconds`;
+                remainingSeconds--;
+
+                if (remainingSeconds < 0) {
+                    clearInterval(countdownTimer);
+                    countdownElement.textContent = '';
+                    enableGetPhoto();
                 }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('An error occurred. Please check the console for details.');
+            }, 1000);
+        }
+
+        function enableGetPhoto() {
+            document.getElementById('message').textContent = 'Countdown finished! You can now retrieve the photo.';
+        }
+
+        function getPhoto() {
+            const photoDataURL = localStorage.getItem('photo');
+            const countdownStartTime = localStorage.getItem('countdownStartTime');
+            const countdown = localStorage.getItem('countdown');
+
+            if (!photoDataURL || !countdownStartTime || !countdown) {
+                document.getElementById('message').textContent = 'No photo available or countdown not started.';
+                return;
+            }
+
+            const currentTime = Date.now();
+            const elapsedTime = Math.floor((currentTime - countdownStartTime) / 1000);
+
+            if (elapsedTime >= countdown) {
+                const photoDisplay = document.getElementById('photoDisplay');
+                photoDisplay.src = photoDataURL;
+                photoDisplay.style.display = 'block';
+                document.getElementById('message').textContent = 'Photo retrieved successfully!';
+            } else {
+                const remainingSeconds = countdown - elapsedTime;
+                document.getElementById('message').textContent = `Countdown not finished yet. ${remainingSeconds} seconds remaining.`;
             }
         }
     </script>

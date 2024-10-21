@@ -39,7 +39,7 @@ app.get('/api/get-photo', (req, res) => {
     }
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000; // Use the port provided by Render
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
